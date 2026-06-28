@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZEON — Roblox Script Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config={theme:{extend:{fontFamily:{inter:['Inter','sans-serif']}}}}
+    </script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Inter',sans-serif;background:#000;color:#f0f0f0;overflow-x:hidden;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+        /* ===== LIQUID GLASS CORE ===== */
+        .glass{
+            background:rgba(255,255,255,0.025);
+            backdrop-filter:blur(40px) saturate(150%);
+            -webkit-backdrop-filter:blur(40px) saturate(150%);
+            border:1px solid rgba(255,255,255,0.06);
+            border-radius:24px;
+            position:relative;
+            overflow:hidden;
+        }
+        .glass::before{
+            content:'';position:absolute;inset:0;
+            background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,transparent 40%,transparent 60%,rgba(255,255,255,0.02) 100%);
+            border-radius:inherit;pointer-events:none;
+        }
+        .glass-shine{
+            position:absolute;top:0;left:0;right:0;height:50%;
+            background:linear-gradient(180deg,rgba(255,255,255,0.04) 0%,transparent 100%);
+            border-radius:24px 24px 0 0;pointer-events:none;
+        }
+
+        /* ===== BACKGROUNDS ===== */
+        .bg-liquid{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+        .blob{position:absolute;border-radius:50%;filter:blur(80px);opacity:0.4}
+        .blob-1{width:500px;height:500px;top:-10%;left:-5%;background:radial-gradient(circle,rgba(220,38,38,0.35),transparent 70%);animation:lb1 20s ease-in-out infinite}
+        .blob-2{width:400px;height:400px;top:30%;right:-8%;background:radial-gradient(circle,rgba(185,28,28,0.25),transparent 70%);animation:lb2 18s ease-in-out infinite}
+        .blob-3{width:350px;height:350px;bottom:5%;left:20%;background:radial-gradient(circle,rgba(127,29,29,0.2),transparent 70%);animation:lb3 22s ease-in-out infinite}
+        .blob-4{width:250px;height:250px;top:60%;left:60%;background:radial-gradient(circle,rgba(220,38,38,0.15),transparent 70%);animation:lb4 16s ease-in-out infinite}
+        @keyframes lb1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(80px,60px) scale(1.15)}66%{transform:translate(-40px,100px) scale(0.9)}}
+        @keyframes lb2{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-70px,-50px) scale(1.1)}66%{transform:translate(50px,-80px) scale(0.85)}}
+        @keyframes lb3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(60px,-40px) scale(1.2)}}
+        @keyframes lb4{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-50px,30px) scale(1.3)}}
+
+        .bg-mesh{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(rgba(255,255,255,0.015) 1px,transparent 1px);background-size:40px 40px;mask-image:radial-gradient(ellipse 60% 50% at 50% 30%,black 10%,transparent 100%);-webkit-mask-image:radial-gradient(ellipse 60% 50% at 50% 30%,black 10%,transparent 100%)}
+        .bg-vignette{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.7) 100%);pointer-events:none}
+
+        /* ===== REVEAL ===== */
+        .reveal{opacity:0;filter:blur(14px);transform:translateY(30px) scale(0.97);transition:all 1s cubic-bezier(0.22,1,0.36,1)}
+        .reveal.active{opacity:1;filter:blur(0);transform:translateY(0) scale(1)}
+
+        /* ===== GLASS CARD HOVER ===== */
+        .glass-card{transition:all 0.6s cubic-bezier(0.22,1,0.36,1)}
+        .glass-card:hover{transform:translateY(-8px) scale(1.01);border-color:rgba(255,255,255,0.1);box-shadow:0 40px 100px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.05)}
+        .glass-card:hover .card-refraction{opacity:1;transform:translate(-50%,-50%) scale(1)}
+        .card-refraction{position:absolute;top:50%;left:50%;width:300px;height:300px;transform:translate(-50%,-50%) scale(0.8);background:radial-gradient(circle,rgba(220,38,38,0.06),transparent 60%);border-radius:50%;opacity:0;transition:all 0.6s ease;pointer-events:none}
+
+        /* ===== BUTTONS ===== */
+        .z-btn{display:inline-flex;align-items:center;gap:10px;padding:15px 30px;border-radius:16px;font-weight:700;font-size:14px;cursor:pointer;border:none;transition:all 0.5s cubic-bezier(0.22,1,0.36,1);font-family:'Inter',sans-serif;position:relative;overflow:hidden}
+        .z-btn .material-icons-round{font-size:20px;transition:transform 0.4s cubic-bezier(0.22,1,0.36,1)}
+        .z-btn:hover .material-icons-round{transform:translateY(2px)}
+        .z-btn:active{transform:scale(0.96)!important}
+
+        .btn-glass-red{
+            background:rgba(220,38,38,0.15);
+            backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+            border:1px solid rgba(220,38,38,0.25);
+            color:#fca5a5;
+            box-shadow:0 0 30px rgba(220,38,38,0.1),inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .btn-glass-red:hover{
+            background:rgba(220,38,38,0.25);border-color:rgba(220,38,38,0.4);
+            box-shadow:0 0 50px rgba(220,38,38,0.2),inset 0 1px 0 rgba(255,255,255,0.08);
+            transform:translateY(-2px);color:#fff
+        }
+        .btn-glass{
+            background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+            border:1px solid rgba(255,255,255,0.08);color:#f0f0f0;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+        .btn-glass:hover{background:rgba(255,255,255,0.08);border-color:rgba(255,255,255,0.14);transform:translateY(-2px)}
+        .btn-disabled{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);color:#555;cursor:not-allowed}
+        .btn-disabled:hover{transform:none;background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.04);color:#555}
+
+        /* ===== BADGES ===== */
+        .badge{display:inline-flex;align-items:center;gap:5px;padding:5px 14px;border-radius:100px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+        .badge-green{background:rgba(34,197,94,0.08);color:#22c55e;border:1px solid rgba(34,197,94,0.12)}
+        .badge-red{background:rgba(220,38,38,0.08);color:#ef4444;border:1px solid rgba(220,38,38,0.12)}
+        .badge-cyan{background:rgba(6,182,212,0.08);color:#06b6d4;border:1px solid rgba(6,182,212,0.12)}
+        .badge-dim{background:rgba(255,255,255,0.03);color:#555;border:1px solid rgba(255,255,255,0.05)}
+
+        /* ===== PLATFORM ICON ===== */
+        .plat-icon{width:60px;height:60px;border-radius:18px;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+        .plat-icon .material-icons-round{font-size:28px}
+        .pi-win{background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.12);color:#ef4444}
+        .pi-and{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);color:#555}
+
+        /* ===== FEATURE ITEM ===== */
+        .feat{display:flex;align-items:center;gap:10px;padding:6px 0}
+        .feat .material-icons-round{font-size:15px;flex-shrink:0}
+
+        /* ===== SELECT ===== */
+        .z-select{background:rgba(255,255,255,0.03);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:12px 40px 12px 16px;color:#f0f0f0;font-size:13px;font-family:'Inter',sans-serif;cursor:pointer;outline:none;transition:all 0.4s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;width:100%}
+        .z-select:hover,.z-select:focus{border-color:rgba(220,38,38,0.3);background-color:rgba(220,38,38,0.03)}
+        .z-select option{background:#111;color:#f0f0f0}
+
+        /* ===== TICKER ===== */
+        .ticker-wrap{overflow:hidden;white-space:nowrap;border-top:1px solid rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.03);padding:14px 0}
+        .ticker-content{display:inline-flex;gap:44px;animation:tL 45s linear infinite}
+        .ticker-content span{display:inline-flex;align-items:center;gap:7px;font-size:10px;color:#555;text-transform:uppercase;letter-spacing:2.5px;font-weight:700}
+        .ticker-content span .material-icons-round{font-size:14px;color:rgba(220,38,38,0.5)}
+        @keyframes tL{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+        /* ===== STATS ===== */
+        .stat-num{font-size:42px;font-weight:900;letter-spacing:-2.5px;line-height:1}
+        .stat-red{background:linear-gradient(180deg,#fca5a5 15%,rgba(220,38,38,0.5) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .stat-white{background:linear-gradient(180deg,#f0f0f0 25%,#555 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+        /* ===== SECTION LABEL ===== */
+        .sec-label{display:inline-flex;align-items:center;gap:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:3px;color:#555;margin-bottom:18px}
+        .sec-label .dot{width:5px;height:5px;border-radius:50%;background:#dc2626;box-shadow:0 0 12px rgba(220,38,38,0.8);animation:pD 2s ease-in-out infinite}
+        @keyframes pD{0%,100%{opacity:1}50%{opacity:0.3}}
+
+        /* ===== SCRIPT SEARCH ===== */
+        .search-box{
+            background:rgba(255,255,255,0.025);backdrop-filter:blur(30px) saturate(150%);-webkit-backdrop-filter:blur(30px) saturate(150%);
+            border:1px solid rgba(255,255,255,0.06);border-radius:18px;
+            transition:all 0.5s cubic-bezier(0.22,1,0.36,1);position:relative;overflow:hidden
+        }
+        .search-box::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.04) 0%,transparent 50%);border-radius:inherit;pointer-events:none}
+        .search-box:focus-within{border-color:rgba(220,38,38,0.3);box-shadow:0 0 40px rgba(220,38,38,0.08)}
+        .search-input{background:transparent;border:none;outline:none;color:#f0f0f0;font-family:'Inter',sans-serif;font-size:15px;width:100%;padding:18px 20px 18px 52px}
+        .search-input::placeholder{color:#444}
+
+        .script-result{
+            background:rgba(255,255,255,0.015);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+            border:1px solid rgba(255,255,255,0.04);border-radius:16px;
+            padding:18px 22px;transition:all 0.4s cubic-bezier(0.22,1,0.36,1);position:relative;overflow:hidden;cursor:pointer
+        }
+        .script-result::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.03) 0%,transparent 50%);border-radius:inherit;pointer-events:none}
+        .script-result:hover{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.08);transform:translateX(4px)}
+
+        .tag{display:inline-flex;align-items:center;padding:3px 10px;border-radius:8px;font-size:10px;font-weight:600;letter-spacing:0.3px}
+        .tag-game{background:rgba(220,38,38,0.08);color:#fca5a5;border:1px solid rgba(220,38,38,0.1)}
+        .tag-universal{background:rgba(6,182,212,0.08);color:#67e8f9;border:1px solid rgba(6,182,212,0.1)}
+        .tag-hot{background:rgba(234,179,8,0.08);color:#fde047;border:1px solid rgba(234,179,8,0.1)}
+
+        /* ===== SCRIPT PREVIEW ===== */
+        .script-box{background:rgba(0,0,0,0.5);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.04);border-radius:20px;overflow:hidden;font-family:'SF Mono','Fira Code','Cascadia Code',monospace}
+        .script-top{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.015)}
+        .sdot{width:10px;height:10px;border-radius:50%}
+        .script-code{padding:22px 24px;font-size:12px;line-height:1.85}
+        .kw{color:#f87171}.fn{color:#67e8f9}.str{color:#4ade80}.cm{color:#333}.num{color:#fbbf24}.op{color:#555}.vr{color:#e5e5e5}
+
+        /* ===== TABLE ===== */
+        .z-table{width:100%;border-collapse:collapse}
+        .z-table th,.z-table td{padding:14px 20px;text-align:left;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.03)}
+        .z-table th{color:#555;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:1.5px}
+        .z-table td{color:#e5e5e5}
+        .z-table tr:last-child td,.z-table tr:last-child th{border-bottom:none}
+        .z-table .material-icons-round{font-size:17px;vertical-align:middle}
+
+        /* ===== REQ GRID ===== */
+        .req-g{display:grid;grid-template-columns:100px 1fr;gap:6px 14px;font-size:13px}
+        .req-g dt{color:#555;font-weight:500}
+        .req-g dd{color:#e5e5e5}
+
+        /* ===== PARTICLES ===== */
+        .particle{position:fixed;border-radius:50%;pointer-events:none;z-index:0;backdrop-filter:blur(1px);-webkit-backdrop-filter:blur(1px)}
+
+        /* ===== TOAST ===== */
+        .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);background:rgba(10,10,10,0.9);backdrop-filter:blur(30px) saturate(150%);-webkit-backdrop-filter:blur(30px) saturate(150%);border:1px solid rgba(255,255,255,0.08);padding:14px 24px;border-radius:18px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;z-index:1000;transition:transform 0.6s cubic-bezier(0.22,1,0.36,1),opacity 0.6s ease;opacity:0;box-shadow:0 30px 80px rgba(0,0,0,0.6)}
+        .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+        /* ===== NAV ===== */
+        nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 24px;background:rgba(0,0,0,0.5);backdrop-filter:blur(40px) saturate(150%);-webkit-backdrop-filter:blur(40px) saturate(150%);border-bottom:1px solid rgba(255,255,255,0.04)}
+        nav::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 10%,rgba(220,38,38,0.15) 50%,transparent 90%)}
+
+        /* ===== SEPARATOR ===== */
+        .sep{height:1px;background:linear-gradient(90deg,transparent,rgba(220,38,38,0.08),transparent);max-width:400px;margin:0 auto}
+
+        /* ===== DEV OVERLAY ===== */
+        .dev-overlay{position:absolute;inset:0;border-radius:24px;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10}
+        .dev-overlay .material-icons-round{font-size:36px;color:#555}
+        .dev-overlay span{color:#666;font-size:13px;font-weight:600;letter-spacing:0.5px}
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar{width:4px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:rgba(220,38,38,0.15);border-radius:2px}
+        ::-webkit-scrollbar-thumb:hover{background:rgba(220,38,38,0.3)}
+
+        /* ===== RESULTS SCROLL ===== */
+        .results-scroll{max-height:420px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(220,38,38,0.15) transparent}
+        .results-scroll::-webkit-scrollbar{width:3px}
+
+        @media(max-width:768px){.stat-num{font-size:28px;letter-spacing:-1.5px}}
+    </style>
+</head>
+<body>
+
+    <div class="bg-liquid">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="blob blob-4"></div>
+    </div>
+    <div class="bg-mesh"></div>
+    <div class="bg-vignette"></div>
+    <div id="particles"></div>
+
+    <!-- Nav -->
+    <nav>
+        <div class="max-w-[1200px] mx-auto flex items-center justify-between">
+            <span class="font-black text-[16px] tracking-[-0.5px]" style="letter-spacing:2px">ZEON</span>
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#downloads" class="text-[11px] font-semibold uppercase tracking-[0.15em] hover:text-white transition-colors duration-300" style="color:#555">Downloads</a>
+                <a href="#features" class="text-[11px] font-semibold uppercase tracking-[0.15em] hover:text-white transition-colors duration-300" style="color:#555">Features</a>
+                <a href="#scripts" class="text-[11px] font-semibold uppercase tracking-[0.15em] hover:text-white transition-colors duration-300" style="color:#555">Script Hub</a>
+                <a href="#compare" class="text-[11px] font-semibold uppercase tracking-[0.15em] hover:text-white transition-colors duration-300" style="color:#555">Compare</a>
+            </div>
+            <button class="z-btn btn-glass-red text-[11px] px-5 py-2.5" style="border-radius:12px" onclick="scrollTo('#downloads')">Download</button>
+        </div>
+    </nav>
+
+    <main class="relative z-10">
+
+        <!-- Hero -->
+        <section class="min-h-[90vh] flex flex-col items-center justify-center text-center px-6 pt-[130px] pb-[60px]">
+            <div class="reveal" id="h1">
+                <div class="flex items-center justify-center gap-2.5 mb-8">
+                    <span class="badge badge-green"><span class="material-icons-round" style="font-size:10px">verified_user</span>Undetected</span>
+                    <span class="badge badge-cyan"><span class="material-icons-round" style="font-size:10px">update</span>Patched Today</span>
+                    <span class="badge badge-red"><span class="material-icons-round" style="font-size:10px">bolt</span>v9.1.0</span>
+                </div>
+            </div>
+
+            <h1 class="reveal text-[clamp(48px,9vw,100px)] font-black leading-[0.88] tracking-[-5px] max-w-[900px] mb-7" id="h2" style="transition-delay:0.08s">
+                The most powerful<br>
+                <span style="background:linear-gradient(135deg,#fca5a5 0%,#dc2626 50%,#7f1d1d 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Roblox executor</span>
+            </h1>
+
+            <p class="reveal text-[15px] font-light leading-[1.6] max-w-[480px] mb-12" id="h3" style="color:#666;transition-delay:0.16s">
+                Level 8+ execution. Byfron bypass. Zero detections. Completely free.
+            </p>
+
+            <div class="reveal flex flex-wrap items-center justify-center gap-4 mb-20" id="h4" style="transition-delay:0.24s">
+                <button class="z-btn btn-glass-red" onclick="scrollTo('#downloads')" style="padding:17px 38px;font-size:15px">
+                    <span class="material-icons-round">download</span>
+                    Download Free
+                </button>
+                <button class="z-btn btn-glass" onclick="scrollTo('#scripts')">
+                    <span class="material-icons-round">code</span>
+                    Script Hub
+                </button>
+            </div>
+
+            <div class="reveal flex flex-wrap items-center justify-center gap-12 md:gap-20" id="h5" style="transition-delay:0.32s">
+                <div class="text-center"><div class="stat-num stat-red">150+</div><div class="text-[10px] mt-2 font-bold uppercase tracking-[0.2em]" style="color:#444">Users</div></div>
+                <div class="text-center"><div class="stat-num stat-white">0</div><div class="text-[10px] mt-2 font-bold uppercase tracking-[0.2em]" style="color:#444">Detections</div></div>
+                <div class="text-center"><div class="stat-num stat-red">Lvl 8+</div><div class="text-[10px] mt-2 font-bold uppercase tracking-[0.2em]" style="color:#444">Execution</div></div>
+                <div class="text-center"><div class="stat-num stat-white">3s</div><div class="text-[10px] mt-2 font-bold uppercase tracking-[0.2em]" style="color:#444">Inject</div></div>
+            </div>
+        </section>
+
+        <!-- Ticker -->
+        <div class="ticker-wrap my-4">
+            <div class="ticker-content">
+                <span><span class="material-icons-round">security</span>Byfron Bypass</span>
+                <span><span class="material-icons-round">speed</span>3s Inject</span>
+                <span><span class="material-icons-round">code</span>Decompiler</span>
+                <span><span class="material-icons-round">auto_fix_high</span>Auto Attach</span>
+                <span><span class="material-icons-round">library_books</span>3000+ Scripts</span>
+                <span><span class="material-icons-round">shield</span>HWID Spoofer</span>
+                <span><span class="material-icons-round">save</span>SaveInstance</span>
+                <span><span class="material-icons-round">bug_report</span>Debug Library</span>
+                <span><span class="material-icons-round">security</span>Byfron Bypass</span>
+                <span><span class="material-icons-round">speed</span>3s Inject</span>
+                <span><span class="material-icons-round">code</span>Decompiler</span>
+                <span><span class="material-icons-round">auto_fix_high</span>Auto Attach</span>
+                <span><span class="material-icons-round">library_books</span>3000+ Scripts</span>
+                <span><span class="material-icons-round">shield</span>HWID Spoofer</span>
+                <span><span class="material-icons-round">save</span>SaveInstance</span>
+                <span><span class="material-icons-round">bug_report</span>Debug Library</span>
+            </div>
+        </div>
+
+        <!-- Downloads -->
+        <section id="downloads" class="max-w-[1200px] mx-auto px-6 py-[110px]">
+            <div class="text-center mb-16 reveal">
+                <div class="sec-label justify-center"><span class="dot"></span><span>Downloads</span></div>
+                <h2 class="text-[clamp(30px,5vw,52px)] font-black tracking-[-2.5px] mb-3">Choose your platform</h2>
+                <p class="text-[15px] font-light max-w-[400px] mx-auto" style="color:#555">Free. No keys. No linkvertise.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Windows -->
+                <div class="glass glass-card p-8 reveal">
+                    <div class="glass-shine"></div>
+                    <div class="card-refraction"></div>
+                    <div class="relative z-10">
+                        <div class="flex items-start justify-between mb-7">
+                            <div class="plat-icon pi-win"><span class="material-icons-round">laptop_windows</span></div>
+                            <span class="badge badge-red"><span class="material-icons-round" style="font-size:10px">star</span>Recommended</span>
+                        </div>
+                        <h3 class="text-[22px] font-black tracking-[-0.5px] mb-1">Windows</h3>
+                        <p class="text-[12px] mb-0.5" style="color:#555">v9.1.0 · 22.4 MB · ZIP</p>
+                        <p class="text-[11px] mb-6" style="color:#444">May 28, 2026 · Byfron bypass active</p>
+
+                        <div class="mb-5">
+                            <label class="text-[10px] font-bold uppercase tracking-[0.2em] mb-2 block" style="color:#555">Build</label>
+                            <select class="z-select" id="win-build">
+                                <option value="stable">Stable — Most Reliable</option>
+                                <option value="beta">Beta — Latest Features</option>
+                                <option value="lite">Lite — Low RAM Usage</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-0.5 mb-8">
+                            <div class="feat"><span class="material-icons-round" style="color:#dc2626">check</span><span class="text-[13px]">Level 8+ script execution</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#dc2626">check</span><span class="text-[13px]">Byfron / Hyperion bypass</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#dc2626">check</span><span class="text-[13px]">Built-in decompiler & saveinstance</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#dc2626">check</span><span class="text-[13px]">Auto-attach & multi-Roblox</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#dc2626">check</span><span class="text-[13px]">Custom DLL injection engine</span></div>
+                        </div>
+
+                        <div class="flex gap-3">
+                            <button class="z-btn btn-glass-red flex-1 justify-center" onclick="doDL('windows')"><span class="material-icons-round">download</span>Download</button>
+                            <button class="z-btn btn-glass justify-center" onclick="copyLnk('windows')" title="Copy link"><span class="material-icons-round">link</span></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Android — Under Development -->
+                <div class="glass glass-card p-8 reveal" style="transition-delay:0.1s">
+                    <div class="glass-shine"></div>
+                    <div class="card-refraction"></div>
+                    <div class="dev-overlay">
+                        <span class="material-icons-round">engineering</span>
+                        <span>Under Development</span>
+                        <span class="text-[11px]" style="color:#444;font-weight:400">Android version coming Q1 2026</span>
+                    </div>
+                    <div class="relative z-10" style="opacity:0.4">
+                        <div class="flex items-start justify-between mb-7">
+                            <div class="plat-icon pi-and"><span class="material-icons-round">android</span></div>
+                            <span class="badge badge-dim"><span class="material-icons-round" style="font-size:10px">schedule</span>Soon</span>
+                        </div>
+                        <h3 class="text-[22px] font-black tracking-[-0.5px] mb-1">Android</h3>
+                        <p class="text-[12px] mb-0.5" style="color:#555">v9.1.0 · APK</p>
+                        <p class="text-[11px] mb-6" style="color:#444">Coming Q1 2025</p>
+
+                        <div class="space-y-0.5 mb-8">
+                            <div class="feat"><span class="material-icons-round" style="color:#444">check</span><span class="text-[13px]">Level 7+ script execution</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#444">check</span><span class="text-[13px]">No root required</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#444">check</span><span class="text-[13px]">Floating script hub overlay</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#444">check</span><span class="text-[13px]">Auto-inject on game launch</span></div>
+                            <div class="feat"><span class="material-icons-round" style="color:#444">check</span><span class="text-[13px]">Script editor with highlighting</span></div>
+                        </div>
+
+                        <button class="z-btn btn-disabled w-full justify-center" disabled><span class="material-icons-round">download</span>Coming Soon</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- No key notice -->
+            <div class="glass mt-6 p-5 reveal" style="transition-delay:0.15s;border-radius:18px">
+                <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div class="flex items-center gap-3 flex-1">
+                        <span class="material-icons-round" style="color:#22c55e;font-size:22px">vpn_key_off</span>
+                        <div>
+                            <div class="text-[14px] font-bold">No Key System — Ever</div>
+                            <div class="text-[12px]" style="color:#555">Download, extract, open Roblox, inject. That's it.</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider shrink-0" style="color:#444">
+                        <span class="material-icons-round" style="font-size:14px;color:#22c55e">verified</span>
+                        VirusTotal: 0/72
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="sep"></div>
+
+        <!-- Script Hub -->
+        <section id="scripts" class="max-w-[1200px] mx-auto px-6 py-[110px]">
+            <div class="text-center mb-16 reveal">
+                <div class="sec-label justify-center"><span class="dot"></span><span>Script Hub</span></div>
+                <h2 class="text-[clamp(30px,5vw,52px)] font-black tracking-[-2.5px] mb-3">Powered by BloxScript</h2>
+                <p class="text-[15px] font-light max-w-[440px] mx-auto" style="color:#555">Search 3000+ scripts. Updated in real-time.</p>
+            </div>
+
+            <div class="grid lg:grid-cols-5 gap-6">
+                <!-- Search & Results -->
+                <div class="lg:col-span-3 reveal">
+                    <div class="search-box mb-5">
+                        <div class="glass-shine" style="border-radius:18px 18px 0 0"></div>
+                        <span class="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 z-10" style="color:#444;font-size:22px">search</span>
+                        <input type="text" class="search-input" id="scriptSearch" placeholder="Search scripts... (e.g. blox fruits, fly, esp)" oninput="searchScripts(this.value)" autocomplete="off">
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex items-center gap-2">
+                            <span class="text-[10px] font-bold uppercase tracking-wider" style="color:#444" id="resultCount">3000+ scripts</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick filters -->
+                    <div class="flex flex-wrap gap-2 mb-5" id="filterTags">
+                        <button class="tag tag-hot filter-btn active-filter" onclick="filterBy('all')" data-filter="all">All</button>
+                        <button class="tag tag-game filter-btn" onclick="filterBy('game')" data-filter="game">Game Scripts</button>
+                        <button class="tag tag-universal filter-btn" onclick="filterBy('universal')" data-filter="universal">Universal</button>
+                        <button class="tag tag-game filter-btn" onclick="filterBy('hot')" data-filter="hot">🔥 Hot</button>
+                    </div>
+
+                    <div class="results-scroll space-y-3" id="scriptResults">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Code Preview -->
+                <div class="lg:col-span-2 reveal" style="transition-delay:0.1s">
+                    <div class="script-box sticky top-[90px]">
+                        <div class="script-top">
+                            <div class="sdot" style="background:#dc2626"></div>
+                            <div class="sdot" style="background:#eab308"></div>
+                            <div class="sdot" style="background:#22c55e"></div>
+                            <span class="text-[11px] ml-3 font-semibold tracking-wide" style="color:#555" id="previewTitle">script.lua — Zeon Editor</span>
+                        </div>
+                        <div class="script-code" id="previewCode">
+                            <div><span class="cm">-- Select a script to preview</span></div>
+                            <br>
+                            <div><span class="cm">-- Use the search bar to find</span></div>
+                            <div><span class="cm">-- scripts from BloxScript API</span></div>
+                            <br>
+                            <div><span class="kw">local</span> <span class="vr">Zeon</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"..."</span>))()</div>
+                            <div><span class="vr">Zeon</span>.<span class="fn">Run</span>()</div>
+                        </div>
+                        <div style="padding:14px 20px;border-top:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:space-between">
+                            <div class="flex items-center gap-2">
+                                <span class="material-icons-round" style="font-size:14px;color:#555">data_object</span>
+                                <span class="text-[11px] font-semibold" style="color:#444" id="previewLines">0 lines</span>
+                            </div>
+                            <button class="z-btn btn-glass-red text-[11px] px-4 py-2" style="border-radius:10px" onclick="copyScript()">
+                                <span class="material-icons-round" style="font-size:14px">content_copy</span>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="sep"></div>
+
+        <!-- Features -->
+        <section id="features" class="max-w-[1200px] mx-auto px-6 py-[110px]">
+            <div class="text-center mb-16 reveal">
+                <div class="sec-label justify-center"><span class="dot"></span><span>Features</span></div>
+                <h2 class="text-[clamp(30px,5vw,52px)] font-black tracking-[-2.5px] mb-3">Why Zeon?</h2>
+                <p class="text-[15px] font-light max-w-[400px] mx-auto" style="color:#555">Built for performance. Built for stealth.</p>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div class="glass glass-card p-6 reveal">
+                    <div class="glass-shine"></div><div class="card-refraction"></div>
+                    <div class="w-11 h-11 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.08);backdrop-filter:blur(12px)">
+                        <span class="material-icons-round" style="color:#f87171;font-size:22px">security</span>
+                    </div>
+                    <h4 class="text-[15px] font-bold mb-2">Byfron Bypass</h4>
+                    <p class="text-[12px] leading-relaxed" style="color:#555">Custom Hyperion bypass. Updated within hours of any Roblox security patch.</p>
+                </div>
+                <div class="glass glass-card p-6 reveal" style="transition-delay:0.05s">
+                    <div class="glass-shine"></div><div class="card-refraction"></div>
+                    <div class="w-11 h-11 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.08);backdrop-filter:blur(12px)">
+                        <span class="material-icons-round" style="color:#f87171;font-size:22px">bolt</span>
+                    </div>
+                    <h4 class="text-[15px] font-bold mb-2">3s Injection</h4>
+                    <p class="text-[12px] leading-relaxed" style="color:#555">Custom DLL engine. Injects in under 3 seconds. No crashes, no freezing.</p>
+                </div>
+                <div class="glass glass-card p-6 reveal" style="transition-delay:0.1s">
+                    <div class="glass-shine"></div><div class="card-refraction"></div>
+                    <div class="w-11 h-11 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.08);backdrop-filter:blur(12px)">
+                        <span class="material-icons-round" style="color:#f87171;font-size:22px">auto_fix_high</span>
+                    </div>
+                    <h4 class="text-[15px] font-bold mb-2">Auto Attach</h4>
+                    <p class="text-[12px] leading-relaxed" style="color:#555">Finds and attaches to Roblox automatically. No manual process selection.</p>
+                </div>
+                <div class="glass glass-card p-6 reveal" style="transition-delay:0.15s">
+                    <div class="glass-shine"></div><div class="card-refraction"></div>
+                    <div class="w-11 h-11 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.08);backdrop-filter:blur(12px)">
+                        <span class="material-icons-round" style="color:#f87171;font-size:22px">code</span>
+                    </div>
+                    <h4 class="text-[15px] font-bold mb-2">Full Decompiler</h4>
+                    <p class="text-[12px] leading-relaxed" style="color:#555">Decompile LocalScripts, ModuleScripts, Scripts. Full Lua disassembler.</p>
+                </div>
+                <div class="glass glass-card p-6 reveal" style="transition-delay:0.2s">
+                    <div class="glass-shine"></div><div class="card-refraction"></div>
+                    <div class="w-11 h-11 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.08);backdrop-filter:blur(12px)">
+                        <span class="material-icons-round" style="color:#f87171;font-size:22px">shield</span>
+                    </div>
+                    <h4 class="text-[15px] font-bold mb-2">HWID Spoofer</h4>
+                    <p class="text-[12px] leading-relaxed" style="color:#555">Built-in hardware ID spoofer. Flagged? Spoof and you're back instantly.</p>
+                </div>
+                <div class="glass glass-card p-6 reveal" style="transition-delay:0.25s">
+                    <div class="glass-shine"></div><div class="card-refraction"></div>
+                    <div class="w-11 h-11 rounded-2xl flex items-center justify-center mb-5" style="background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.08);backdrop-filter:blur(12px)">
+                        <span class="material-icons-round" style="color:#f87171;font-size:22px">save</span>
+                    </div>
+                    <h4 class="text-[15px] font-bold mb-2">SaveInstance</h4>
+                    <p class="text-[12px] leading-relaxed" style="color:#555">Save entire maps, models, scripts as .rbxl files. One-click export.</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="sep"></div>
+
+        <!-- Compare -->
+        <section id="compare" class="max-w-[900px] mx-auto px-6 py-[110px]">
+            <div class="text-center mb-16 reveal">
+                <div class="sec-label justify-center"><span class="dot"></span><span>Compare</span></div>
+                <h2 class="text-[clamp(30px,5vw,52px)] font-black tracking-[-2.5px] mb-3">Zeon vs Others</h2>
+                <p class="text-[15px] font-light" style="color:#555">See why 150+ users chose Zeon.</p>
+            </div>
+
+            <div class="glass overflow-hidden reveal">
+                <div class="glass-shine"></div>
+                <div class="overflow-x-auto relative z-10">
+                    <table class="z-table" style="min-width:620px">
+                        <thead>
+                            <tr>
+                                <th>Feature</th>
+                                <th style="text-align:center;color:#dc2626;font-weight:900">ZEON</th>
+                                <th style="text-align:center">Keyless</th>
+                                <th style="text-align:center">Best Quality</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Execution Level</td><td class="text-center" style="color:#dc2626;font-weight:800">8+</td><td class="text-center" style="color:#555">7</td><td class="text-center" style="color:#555">7</td></tr>
+                            <tr><td>Byfron Bypass</td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td><td class="text-center"><span class="material-icons-round" style="color:#444">remove</span></td></tr>
+                            <tr><td>Key System</td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">block</span> <span class="text-[10px] font-bold" style="color:#22c55e">NONE</span></td><td class="text-center"><span class="material-icons-round" style="color:#dc2626">vpn_key</span></td><td class="text-center"><span class="material-icons-round" style="color:#dc2626">vpn_key</span></td></tr>
+                            <tr><td>Script Hub</td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td><td class="text-center"><span class="material-icons-round" style="color:#444">remove</span></td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td></tr>
+                            <tr><td>Decompiler</td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td><td class="text-center"><span class="material-icons-round" style="color:#444">remove</span></td></tr>
+                            <tr><td>HWID Spoofer</td><td class="text-center"><span class="material-icons-round" style="color:#22c55e">check_circle</span></td><td class="text-center"><span class="material-icons-round" style="color:#444">remove</span></td><td class="text-center"><span class="material-icons-round" style="color:#444">remove</span></td></tr>
+                            <tr><td>Price</td><td class="text-center" style="color:#22c55e;font-weight:900">FREE</td><td class="text-center" style="color:#555">$15</td><td class="text-center" style="color:#555">$20</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="max-w-[700px] mx-auto px-6 py-[120px] text-center">
+            <div class="reveal">
+                <div class="glass p-16 md:p-20 relative overflow-hidden">
+                    <div style="position:absolute;top:-80px;left:50%;transform:translateX(-50%);width:500px;height:250px;background:radial-gradient(ellipse,rgba(220,38,38,0.12),transparent 65%);pointer-events:none"></div>
+                    <div class="relative z-10">
+                        <div class="w-16 h-16 rounded-[22px] flex items-center justify-center mx-auto mb-8" style="background:rgba(220,38,38,0.1);border:1px solid rgba(220,38,38,0.15);backdrop-filter:blur(20px)">
+                            <span class="material-icons-round" style="color:#f87171;font-size:32px">rocket_launch</span>
+                        </div>
+                        <h2 class="text-[clamp(26px,4vw,44px)] font-black tracking-[-2px] mb-4">Start executing.</h2>
+                        <p class="text-[14px] font-light mb-10 max-w-[340px] mx-auto" style="color:#555">Free. Keyless. Undetected. 1.2M+ users.</p>
+                        <button class="z-btn btn-glass-red" onclick="doDL('windows')" style="padding:17px 40px;font-size:15px">
+                            <span class="material-icons-round">download</span>
+                            Download for Windows
+                        </button>
+                        <p class="text-[10px] mt-8 flex items-center justify-center gap-1 font-medium tracking-wide" style="color:#333">
+                            <span class="material-icons-round" style="font-size:12px">shield</span>
+                            VirusTotal: 0/72 · No backdoors · Open-source UI
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer style="border-top:1px solid rgba(255,255,255,0.03)" class="py-10 px-6">
+            <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                <span class="text-[11px] font-medium" style="color:#333">© 2024 ZEON. For educational purposes only.</span>
+                <div class="flex items-center gap-6">
+                    <a href="#" class="text-[11px] font-semibold uppercase tracking-wider hover:text-white transition-colors" style="color:#444">Discord</a>
+                    <a href="#" class="text-[11px] font-semibold uppercase tracking-wider hover:text-white transition-colors" style="color:#444">Telegram</a>
+                    <a href="#" class="text-[11px] font-semibold uppercase tracking-wider hover:text-white transition-colors" style="color:#444">YouTube</a>
+                    <a href="#" style="color:#444" class="hover:text-red transition-colors"><span class="material-icons-round" style="font-size:18px">discord</span></a>
+                    <a href="#" style="color:#444" class="hover:text-red transition-colors"><span class="material-icons-round" style="font-size:18px">send</span></a>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <span class="material-icons-round" style="font-size:20px" id="toast-icon">check_circle</span>
+        <span id="toast-text">Done!</span>
+    </div>
+
+    <script>
+        // ===== SCRIPT DATABASE (BloxScript mock) =====
+        const scripts = [
+            {id:1,name:"Blox Fruits Auto Farm V4",game:"Blox Fruits",type:"game",hot:true,runs:"480K",updated:"2h ago",code:`<span class="cm">-- Blox Fruits Auto Farm V4</span>\n<span class="kw">local</span> <span class="vr">Zeon</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/bf-v4"</span>))()\n\n<span class="vr">Zeon</span>.<span class="fn">Config</span> {\n  AutoFarm   <span class="op">=</span> <span class="kw">true</span>,\n  AutoQuest  <span class="op">=</span> <span class="kw">true</span>,\n  FarmSpeed  <span class="op">=</span> <span class="num">400</span>,\n  Teleport   <span class="op">=</span> <span class="kw">true</span>,\n  SafeMode   <span class="op">=</span> <span class="kw">true</span>,\n  AutoSkill  <span class="op">=</span> <span class="kw">true</span>,\n}\n\n<span class="vr">Zeon</span>.<span class="fn">Run</span>()`,lines:14},
+            {id:2,name:"Universal Fly Script",game:"All Games",type:"universal",hot:true,runs:"1.2M",updated:"1h ago",code:`<span class="cm">-- Universal Fly v2</span>\n<span class="kw">local</span> <span class="vr">fly</span> <span class="op">=</span> <span class="kw">true</span>\n<span class="kw">local</span> <span class="vr">speed</span> <span class="op">=</span> <span class="num">80</span>\n<span class="kw">local</span> <span class="vr">plr</span> <span class="op">=</span> <span class="vr">game</span>.<span class="vr">Players</span>.<span class="vr">LocalPlayer</span>\n<span class="kw">local</span> <span class="vr">bp</span> <span class="op">=</span> <span class="vr">plr</span>.<span class="vr">Character</span>.<span class="fn">WaitForChild</span>(<span class="str">"HumanoidRootPart"</span>)\n\n<span class="vr">game</span>:<span class="fn">GetService</span>(<span class="str">"RunService"</span>).<span class="vr">Heartbeat</span>:<span class="fn">Connect</span>(<span class="kw">function</span>(<span class="vr">dt</span>)\n  <span class="kw">if</span> <span class="vr">fly</span> <span class="kw">then</span>\n    <span class="vr">bp</span>.<span class="vr">Velocity</span> <span class="op">=</span> <span class="vr">plr</span>.<span class="vr">Character</span>.<span class="fn">GetVelocity</span>() <span class="op">*</span> <span class="num">0</span>\n    <span class="vr">bp</span>.<span class="vr">CFrame</span> <span class="op">=</span> <span class="vr">bp</span>.<span class="vr">CFrame</span> <span class="op">+</span> <span class="vr">bp</span>.<span class="vr">CFrame</span>.<span class="vr">LookVector</span> <span class="op">*</span> <span class="vr">speed</span> <span class="op">*</span> <span class="vr">dt</span>\n  <span class="kw">end</span>\n<span class="kw">end</span>)`,lines:14},
+            {id:3,name:"Brookhaven Admin Commands",game:"Brookhaven",type:"game",hot:false,runs:"320K",updated:"5h ago",code:`<span class="cm">-- Brookhaven Admin Panel</span>\n<span class="kw">local</span> <span class="vr">Admin</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/bh-admin"</span>))()\n\n<span class="vr">Admin</span>.<span class="fn">AddCommand</span>(<span class="str">"speed"</span>, <span class="kw">function</span>(<span class="vr">v</span>)\n  <span class="vr">game</span>.<span class="vr">Players</span>.<span class="vr">LocalPlayer</span>.<span class="vr">Character</span>.<span class="vr">Humanoid</span>.<span class="vr">WalkSpeed</span> <span class="op">=</span> <span class="vr">v</span>\n<span class="kw">end</span>)\n\n<span class="vr">Admin</span>.<span class="fn">AddCommand</span>(<span class="str">"tp"</span>, <span class="kw">function</span>(<span class="vr">x</span>,<span class="vr">y</span>,<span class="vr">z</span>)\n  <span class="vr">plr</span>.<span class="vr">Character</span>:<span class="fn">MoveTo</span>(<span class="fn">Vector3.new</span>(<span class="vr">x</span>,<span class="vr">y</span>,<span class="vr">z</span>))\n<span class="kw">end</span>)\n\n<span class="vr">Admin</span>.<span class="fn">Init</span>()`,lines:15},
+            {id:4,name:"ESP & Wallhack",game:"All Games",type:"universal",hot:true,runs:"890K",updated:"30m ago",code:`<span class="cm">-- Universal ESP v3</span>\n<span class="kw">local</span> <span class="vr">ESP</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/esp-v3"</span>))()\n\n<span class="vr">ESP</span>.<span class="fn">Config</span> {\n  BoxESP    <span class="op">=</span> <span class="kw">true</span>,\n  NameESP   <span class="op">=</span> <span class="kw">true</span>,\n  HealthBar <span class="op">=</span> <span class="kw">true</span>,\n  Distance  <span class="op">=</span> <span class="kw">true</span>,\n  Tracers   <span class="op">=</span> <span class="kw">false</span>,\n  Color     <span class="op">=</span> <span class="fn">Color3.fromRGB</span>(<span class="num">255</span>,<span class="num">50</span>,<span class="num">50</span>),\n}\n\n<span class="vr">ESP</span>.<span class="fn">Run</span>()`,lines:15},
+            {id:5,name:"Pet Sim 99 Auto Hatch",game:"Pet Simulator 99",type:"game",hot:false,runs:"210K",updated:"4h ago",code:`<span class="cm">-- Pet Sim 99 Auto Hatch</span>\n<span class="kw">local</span> <span class="vr">PS</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/ps99"</span>))()\n\n<span class="vr">PS</span>.<span class="fn">Config</span> {\n  AutoHatch  <span class="op">=</span> <span class="kw">true</span>,\n  Egg        <span class="op">=</span> <span class="str">"Titan Egg"</span>,\n  TripleHatch <span class="op">=</span> <span class="kw">true</span>,\n  AutoEnchant <span class="op">=</span> <span class="kw">true</span>,\n}\n\n<span class="vr">PS</span>.<span class="fn">Run</span>()`,lines:12},
+            {id:6,name:"Infinite Yield",game:"All Games",type:"universal",hot:false,runs:"2.1M",updated:"12h ago",code:`<span class="cm">-- Infinite Yield (Zeon Edition)</span>\n<span class="kw">local</span> <span class="vr">IY</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/iy"</span>))()\n\n<span class="cm">-- 200+ commands available</span>\n<span class="cm">-- Type ;cmds in chat to see all</span>\n\n<span class="vr">IY</span>.<span class="fn">Load</span>()`,lines:8},
+            {id:7,name:"Blox Fruits Raid Helper",game:"Blox Fruits",type:"game",hot:true,runs:"180K",updated:"1h ago",code:`<span class="cm">-- Blox Fruits Raid Helper</span>\n<span class="kw">local</span> <span class="vr">Raid</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/bf-raid"</span>))()\n\n<span class="vr">Raid</span>.<span class="fn">Config</span> {\n  AutoRaid    <span class="op">=</span> <span class="kw">true</span>,\n  AutoFight   <span class="op">=</span> <span class="kw">true</span>,\n  SkipCutscene <span class="op">=</span> <span class="kw">true</span>,\n  TeamSelect  <span class="op">=</span> <span class="str">"Pirate"</span>,\n}\n\n<span class="vr">Raid</span>.<span class="fn">Run</span>()`,lines:13},
+            {id:8,name:"Silent Aim Script",game:"All Games",type:"universal",hot:true,runs:"650K",updated:"3h ago",code:`<span class="cm">-- Silent Aim v2</span>\n<span class="kw">local</span> <span class="vr">Aim</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/silent-aim"</span>))()\n\n<span class="vr">Aim</span>.<span class="fn">Config</span> {\n  Enabled    <span class="op">=</span> <span class="kw">true</span>,\n  FOV        <span class="op">=</span> <span class="num">120</span>,\n  HitPart    <span class="op">=</span> <span class="str">"Head"</span>,\n  Smoothness <span class="op">=</span> <span class="num">0.5</span>,\n  ShowFOV    <span class="op">=</span> <span class="kw">true</span>,\n}\n\n<span class="vr">Aim</span>.<span class="fn">Run</span>()`,lines:14},
+            {id:9,name:"King Legacy Auto Farm",game:"King Legacy",type:"game",hot:false,runs:"95K",updated:"8h ago",code:`<span class="cm">-- King Legacy Auto Farm</span>\n<span class="kw">local</span> <span class="vr">KL</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/kl"</span>))()\n\n<span class="vr">KL</span>.<span class="fn">Config</span> {\n  AutoFarm  <span class="op">=</span> <span class="kw">true</span>,\n  AutoQuest <span class="op">=</span> <span class="kw">true</span>,\n  Stat      <span class="op">=</span> <span class="str">"Melee"</span>,\n}\n\n<span class="vr">KL</span>.<span class="fn">Run</span>()`,lines:11},
+            {id:10,name:"Noclip & Phase",game:"All Games",type:"universal",hot:false,runs:"1.5M",updated:"6h ago",code:`<span class="cm">-- Noclip v1</span>\n<span class="kw">local</span> <span class="vr">noclip</span> <span class="op">=</span> <span class="kw">false</span>\n<span class="kw">local</span> <span class="vr">char</span> <span class="op">=</span> <span class="vr">game</span>.<span class="vr">Players</span>.<span class="vr">LocalPlayer</span>.<span class="vr">Character</span>\n\n<span class="vr">game</span>:<span class="fn">GetService</span>(<span class="str">"RunService"</span>).<span class="vr">Stepped</span>:<span class="fn">Connect</span>(<span class="kw">function</span>()\n  <span class="kw">if</span> <span class="vr">noclip</span> <span class="kw">then</span>\n    <span class="kw">for</span> <span class="vr">_</span>,<span class="vr">v</span> <span class="kw">in</span> <span class="fn">pairs</span>(<span class="vr">char</span>:<span class="fn">GetDescendants</span>()) <span class="kw">do</span>\n      <span class="kw">if</span> <span class="vr">v</span>:<span class="fn">IsA</span>(<span class="str">"BasePart"</span>) <span class="kw">then</span>\n        <span class="vr">v</span>.<span class="vr">CanCollide</span> <span class="op">=</span> <span class="kw">false</span>\n      <span class="kw">end</span>\n    <span class="kw">end</span>\n  <span class="kw">end</span>\n<span class="kw">end</span>)`,lines:15},
+            {id:11,name:"Anime Adventures Auto",game:"Anime Adventures",type:"game",hot:false,runs:"140K",updated:"7h ago",code:`<span class="cm">-- Anime Adventures Auto Farm</span>\n<span class="kw">local</span> <span class="vr">AA</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/aa"</span>))()\n\n<span class="vr">AA</span>.<span class="fn">Config</span> {\n  AutoFarm   <span class="op">=</span> <span class="kw">true</span>,\n  AutoSummon <span class="op">=</span> <span class="kw">true</span>,\n  AutoUpgrade <span class="op">=</span> <span class="kw">true</span>,\n  WaveSkip   <span class="op">=</span> <span class="kw">true</span>,\n}\n\n<span class="vr">AA</span>.<span class="fn">Run</span>()`,lines:13},
+            {id:12,name:"Speed & Jump Modifier",game:"All Games",type:"universal",hot:false,runs:"980K",updated:"2h ago",code:`<span class="cm">-- Speed & Jump Modifier</span>\n<span class="kw">local</span> <span class="vr">plr</span> <span class="op">=</span> <span class="vr">game</span>.<span class="vr">Players</span>.<span class="vr">LocalPlayer</span>\n<span class="kw">local</span> <span class="vr">hum</span> <span class="op">=</span> <span class="vr">plr</span>.<span class="vr">Character</span>.<span class="vr">Humanoid</span>\n\n<span class="vr">hum</span>.<span class="vr">WalkSpeed</span> <span class="op">=</span> <span class="num">200</span>\n<span class="vr">hum</span>.<span class="vr">JumpPower</span> <span class="op">=</span> <span class="num">150</span>\n<span class="vr">hum</span>.<span class="vr">UseJumpPower</span> <span class="op">=</span> <span class="kw">true</span>\n\n<span class="fn">print</span>(<span class="str">"Speed & Jump modified!"</span>)`,lines:10},
+            {id:13,name:"Blox Fruits Devil Fruit Sniper",game:"Blox Fruits",type:"game",hot:true,runs:"270K",updated:"45m ago",code:`<span class="cm">-- Devil Fruit Sniper</span>\n<span class="kw">local</span> <span class="vr">DFS</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/bf-dfs"</span>))()\n\n<span class="vr">DFS</span>.<span class="fn">Config</span> {\n  AutoDetect <span class="op">=</span> <span class="kw">true</span>,\n  AutoTP     <span class="op">=</span> <span class="kw">true</span>,\n  Fruits     <span class="op">=</span> {<span class="str">"Dragon"</span>,<span class="str">"Leopard"</span>,<span class="str">"Venom"</span>},\n  Notify     <span class="op">=</span> <span class="kw">true</span>,\n}\n\n<span class="vr">DFS</span>.<span class="fn">Run</span>()`,lines:13},
+            {id:14,name:"Tower Defense Simulator",game:"Tower Defense Simulator",type:"game",hot:false,runs:"75K",updated:"10h ago",code:`<span class="cm">-- TDS Auto Place & Upgrade</span>\n<span class="kw">local</span> <span class="vr">TDS</span> <span class="op">=</span> <span class="fn">loadstring</span>(<span class="fn">game:HttpGet</span>(<span class="str">"https://bloxscript.api/tds"</span>))()\n\n<span class="vr">TDS</span>.<span class="fn">Config</span> {\n  AutoPlace   <span class="op">=</span> <span class="kw">true</span>,\n  AutoUpgrade <span class="op">=</span> <span class="kw">true</span>,\n  AutoSell    <span class="op">=</span> <span class="kw">true</span>,\n  Tower       <span class="op">=</span> <span class="str">"Military Base"</span>,\n}\n\n<span class="vr">TDS</span>.<span class="fn">Run</span>()`,lines:13},
+            {id:15,name:"Anti-AFK Bot",game:"All Games",type:"universal",hot:false,runs:"3.2M",updated:"1d ago",code:`<span class="cm">-- Anti-AFK Bot</span>\n<span class="kw">local</span> <span class="vr">VirtualUser</span> <span class="op">=</span> <span class="fn">game:GetService</span>(<span class="str">"VirtualUser"</span>)\n<span class="kw">local</span> <span class="vr">plr</span> <span class="op">=</span> <span class="vr">game</span>.<span class="vr">Players</span>.<span class="vr">LocalPlayer\n\n<span class="vr">plr</span>.<span class="vr">Idled</span>:<span class="fn">Connect</span>(<span class="kw">function</span>()\n  <span class="vr">VirtualUser</span>:<span class="fn">CaptureController</span>()\n  <span class="vr">VirtualUser</span>:<span class="fn">ClickButton2</span>(<span class="fn">Vector2.new</span>())\n<span class="kw">end</span>)\n\n<span class="fn">print</span>(<span class="str">"Anti-AFK active!"</span>)`,lines:11}
+        ];
+
+        let currentFilter = 'all';
+        let selectedScript = null;
+
+        function renderScripts(list) {
+            const container = document.getElementById('scriptResults');
+            const countEl = document.getElementById('resultCount');
+            countEl.textContent = list.length + ' script' + (list.length !== 1 ? 's' : '');
+
+            if (list.length === 0) {
+                container.innerHTML = `<div class="text-center py-16"><span class="material-icons-round block mb-3" style="font-size:40px;color:#333">search_off</span><p style="color:#444;font-size:14px">No scripts found</p></div>`;
+                return;
+            }
+
+            container.innerHTML = list.map((s, i) => `
+                <div class="script-result" onclick="selectScript(${s.id})" style="animation:fadeUp 0.4s ${i * 0.04}s both cubic-bezier(0.22,1,0.36,1)">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <span class="text-[13px] font-bold truncate">${s.name}</span>
+                                ${s.hot ? '<span class="tag tag-hot" style="font-size:9px;padding:2px 7px">🔥 HOT</span>' : ''}
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="tag ${s.type === 'universal' ? 'tag-universal' : 'tag-game'}">${s.type === 'universal' ? '⊕ Universal' : s.game}</span>
+                                <span style="color:#444;font-size:10px;font-weight:600">•</span>
+                                <span style="color:#444;font-size:10px;font-weight:600">${s.runs} runs</span>
+                                <span style="color:#333;font-size:10px">•</span>
+                                <span style="color:#333;font-size:10px">${s.updated}</span>
+                            </div>
+                        </div>
+                        <span class="material-icons-round shrink-0" style="font-size:18px;color:#333">chevron_right</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add animation keyframes if not exists
+            if (!document.getElementById('fadeUpStyle')) {
+                const s = document.createElement('style');
+                s.id = 'fadeUpStyle';
+                s.textContent = '@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}';
+                document.head.appendChild(s);
+            }
+        }
+
+        function searchScripts(query) {
+            let filtered = scripts;
+            if (currentFilter === 'game') filtered = filtered.filter(s => s.type === 'game');
+            else if (currentFilter === 'universal') filtered = filtered.filter(s => s.type === 'universal');
+            else if (currentFilter === 'hot') filtered = filtered.filter(s => s.hot);
+
+            if (query.trim()) {
+                const q = query.toLowerCase();
+                filtered = filtered.filter(s =>
+                    s.name.toLowerCase().includes(q) ||
+                    s.game.toLowerCase().includes(q) ||
+                    s.type.toLowerCase().includes(q)
+                );
+            }
+            renderScripts(filtered);
+        }
+
+        function filterBy(type) {
+            currentFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.style.opacity = b.dataset.filter === type ? '1' : '0.4';
+                b.style.transform = b.dataset.filter === type ? 'scale(1.05)' : 'scale(1)';
+            });
+            searchScripts(document.getElementById('scriptSearch').value);
+        }
+
+        function selectScript(id) {
+            const s = scripts.find(x => x.id === id);
+            if (!s) return;
+            selectedScript = s;
+            document.getElementById('previewTitle').textContent = s.name.split(' ').slice(0, 3).join(' ') + '.lua — Zeon Editor';
+            document.getElementById('previewCode').innerHTML = s.code;
+            document.getElementById('previewLines').textContent = s.lines + ' lines';
+
+            // Highlight selected in list
+            document.querySelectorAll('.script-result').forEach((el, i) => {
+                const filtered = getFilteredScripts();
+                if (filtered[i] && filtered[i].id === id) {
+                    el.style.borderColor = 'rgba(220,38,38,0.2)';
+                    el.style.background = 'rgba(220,38,38,0.04)';
+                } else {
+                    el.style.borderColor = '';
+                    el.style.background = '';
+                }
+            });
+        }
+
+        function getFilteredScripts() {
+            let filtered = scripts;
+            if (currentFilter === 'game') filtered = filtered.filter(s => s.type === 'game');
+            else if (currentFilter === 'universal') filtered = filtered.filter(s => s.type === 'universal');
+            else if (currentFilter === 'hot') filtered = filtered.filter(s => s.hot);
+            const q = document.getElementById('scriptSearch').value.trim().toLowerCase();
+            if (q) filtered = filtered.filter(s => s.name.toLowerCase().includes(q) || s.game.toLowerCase().includes(q) || s.type.toLowerCase().includes(q));
+            return filtered;
+        }
+
+        function copyScript() {
+            if (!selectedScript) { showToast('Select a script first', 'info', '#555'); return; }
+            const text = selectedScript.code.replace(/<[^>]*>/g, '');
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Script copied to clipboard!', 'content_copy', '#dc2626');
+            }).catch(() => {
+                showToast('Script ready to paste', 'check_circle', '#22c55e');
+            });
+        }
+
+        // ===== INIT =====
+        renderScripts(scripts);
+
+        // ===== REVEAL =====
+        const obs = new IntersectionObserver(e => { e.forEach(x => { if (x.isIntersecting) x.target.classList.add('active') }) }, { threshold: 0.06, rootMargin: '0px 0px -30px 0px' });
+        document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+        // ===== TOAST =====
+        let tt;
+        function showToast(m, i = 'check_circle', c = '#dc2626') {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-text').textContent = m;
+            const ic = document.getElementById('toast-icon'); ic.textContent = i; ic.style.color = c;
+            t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 3500);
+        }
+
+        // ===== DOWNLOADS =====
+        function doDL(p) {
+            const f = { windows: { stable: 'Zeon-9.1.0-Stable.zip', beta: 'Zeon-9.1.0-Beta.zip', lite: 'Zeon-9.1.0-Lite.zip' } };
+            const s = document.getElementById('win-build').value;
+            const fn = f[p][s];
+            showToast('Preparing ' + fn + '...', 'downloading', '#dc2626');
+            setTimeout(() => {
+                const b = new Blob(['Zeon v9.1.0 — ' + fn], { type: 'application/octet-stream' });
+                const u = URL.createObjectURL(b); const a = document.createElement('a');
+                a.href = u; a.download = fn; a.click(); URL.revokeObjectURL(u);
+                showToast(fn + ' downloaded!', 'check_circle', '#22c55e');
+            }, 1500);
+        }
+
+        function copyLnk(p) {
+            const l = 'https://zeon.dev/download/windows';
+            navigator.clipboard.writeText(l).then(() => showToast('Link copied!', 'content_copy', '#dc2626')).catch(() => showToast(l, 'link', '#dc2626'));
+        }
+
+        function scrollTo(s) { document.querySelector(s).scrollIntoView({ behavior: 'smooth' }); }
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', function (e) {
+                const t = document.querySelector(this.getAttribute('href'));
+                if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+            });
+        });
+
+        // ===== PARTICLES =====
+        !function () {
+            const c = document.getElementById('particles');
+            for (let i = 0; i < 15; i++) {
+                const p = document.createElement('div'); p.className = 'particle';
+                const s = 1 + Math.random() * 2;
+                Object.assign(p.style, {
+                    left: Math.random() * 100 + 'vw', top: Math.random() * 100 + 'vh',
+                    width: s + 'px', height: s + 'px',
+                    background: `rgba(220,38,38,${0.1 + Math.random() * 0.15})`,
+                    animation: `fp ${18 + Math.random() * 20}s ease-in-out infinite`,
+                    animationDelay: `-${Math.random() * 18}s`
+                });
+                c.appendChild(p);
+            }
+            const st = document.createElement('style');
+            st.textContent = `@keyframes fp{0%,100%{transform:translate(0,0);opacity:.15}25%{transform:translate(${r()}px,${r()}px);opacity:.35}50%{transform:translate(${r()}px,${r()}px);opacity:.08}75%{transform:translate(${r()}px,${r()}px);opacity:.25}}`;
+            function r() { return Math.round((Math.random() - .5) * 120) }
+            document.head.appendChild(st);
+        }();
+
+        // ===== HERO REVEALS =====
+        setTimeout(() => {
+            ['h1', 'h2', 'h3', 'h4', 'h5'].forEach((id, i) => {
+                setTimeout(() => { const el = document.getElementById(id); if (el) el.classList.add('active'); }, i * 100);
+            });
+        }, 250);
+    </script>
+</body>
+</html>
